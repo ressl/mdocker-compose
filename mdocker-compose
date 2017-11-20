@@ -1,0 +1,137 @@
+#!/bin/bash
+#
+# control multiple docker-compose files
+#
+# (c) Robert Ressl
+#
+# versions
+# 0.0.1 first release
+
+## settings
+
+# debug mode
+# set -x
+
+# list container names
+IMAGES=(project1 project2 project3 project4)
+COMPOSE_PATH="/srv/compose"
+
+# default
+CLEANUP="yes"
+
+## fix
+
+VERSION=0.0.1
+PROJECT_NAME="mdocker-compose"
+PROJECT_ENTRY=$PROJECT_NAME
+PROJECT="https://github.com/safematix/$PROJECT_NAME"
+
+## functions
+
+version() {
+  echo "$PROJECT"
+  echo "v$VERSION"
+}
+
+showhelp() {
+  version
+  echo "Usage: $PROJECT_ENTRY command ...[parameters]....
+Commands:
+  --help, -h               Show this help message.
+  --version, -v            Show version info.
+  --action, -a             Select action of the script
+  --cleanup, -c            Cleanup docker repository from old data
+
+Parameters:
+  --action, -a             fetch, up, stop, restart, all (fetch & up)
+
+Example:
+  $PROJECT_ENTRY -a all -c
+  "
+}
+
+cleanup () {
+  if [ $CLEANUP = yes ]; then
+    docker system prune -a -f
+  fi
+}
+
+_compose_fetch() {
+  for image in ${IMAGES[*]}; do
+    cd $COMPOSE_PATH/$image
+    docker-compose --project-directory $COMPOSE_PATH/$image -f $COMPOSE_PATH/$image/docker-compose.yml pull
+  done
+}
+
+_compose_up() {
+  for image in ${IMAGES[*]}; do
+    cd $COMPOSE_PATH/$image
+    docker-compose --project-directory $COMPOSE_PATH/$image -f $COMPOSE_PATH/$image/docker-compose.yml up -d
+  done
+}
+
+_compose_stop() {
+  for image in ${IMAGES[*]}; do
+    cd $COMPOSE_PATH/$image
+    docker-compose --project-directory $COMPOSE_PATH/$image -f $COMPOSE_PATH/$image/docker-compose.yml stop
+  done
+}
+
+compose() {
+  # show selected images
+  echo docker-compose images: ${IMAGES[*]}
+
+  ACTION=$1
+
+  case "$ACTION" in
+    fetch)
+      _compose_fetch
+      ;;
+    up)
+      _compose_up
+      ;;
+    all)
+      _compose_fetch
+      _compose_up
+      ;;
+    restart)
+      _compose_stop
+      _compose_up
+      ;;
+    stop)
+      _compose_stop
+      declare -g CLEANUP="no"
+      ;;
+    *)
+      echo "Error"
+      exit 1
+  esac
+}
+
+opts() {
+while getopts ":a:c" opt; do
+  case $opt in
+    a)
+      compose $OPTARG
+      ;;
+    c)
+      cleanup
+      ;;
+    \?)
+      echo "Invalid option: -$OPTARG" >&2
+      exit 1
+      ;;
+    :)
+      echo "Option -$OPTARG requires an argument." >&2
+      exit 1
+      ;;
+  esac
+done
+}
+
+main() {
+  [ -z "$1" ] && showhelp && return
+  opts "$@"
+}
+
+main "$@"
