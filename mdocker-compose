@@ -6,24 +6,33 @@
 #
 # versions
 # 0.0.1 first release
+# 0.1.0 * Add dryrun mode
+#       * Add -v, -h, -d options
+#       * Change from yes to integer
+#       * Options order doesn't matter anymore
 
 ## settings
 
 # debug mode
 # set -x
 
+# declare
+declare -i DRYRUN
+declare -i CLEANUP
+
 # list container names
 IMAGES=(project1 project2 project3 project4)
 COMPOSE_PATH="/srv/compose"
 
 # default
-CLEANUP="yes"
+CLEANUP=1
+DRYRUN=0
 
 ## fix
 
-VERSION=0.0.1
+VERSION=0.1.0
 PROJECT_NAME="mdocker-compose"
-PROJECT_ENTRY=$PROJECT_NAME
+PROJECT_ENTRY="$PROJECT_NAME"
 PROJECT="https://github.com/safematix/$PROJECT_NAME"
 
 ## functions
@@ -41,6 +50,7 @@ Commands:
   --version, -v            Show version info.
   --action, -a             Select action of the script
   --cleanup, -c            Cleanup docker repository from old data
+  --dryrun, -d             Show the command without executing
 
 Parameters:
   --action, -a             fetch, up, stop, restart, all (fetch & up)
@@ -50,30 +60,38 @@ Example:
   "
 }
 
+dryrun() {
+  if [[ "$DRYRUN" -ne "1" ]]; then
+    eval "${@}"
+  else
+    echo "${@}"
+  fi
+}
+
 cleanup () {
-  if [ $CLEANUP = yes ]; then
-    docker system prune -a -f
+  if [[ "$CLEANUP" -eq "1" ]]; then
+    dryrun docker system prune -a -f
   fi
 }
 
 _compose_fetch() {
   for image in ${IMAGES[*]}; do
-    cd $COMPOSE_PATH/$image
-    docker-compose --project-directory $COMPOSE_PATH/$image -f $COMPOSE_PATH/$image/docker-compose.yml pull
+    dryrun cd "$COMPOSE_PATH"/"$image"
+    dryrun docker-compose --project-directory "$COMPOSE_PATH"/"$image" -f "$COMPOSE_PATH"/"$image"/docker-compose.yml pull
   done
 }
 
 _compose_up() {
   for image in ${IMAGES[*]}; do
-    cd $COMPOSE_PATH/$image
-    docker-compose --project-directory $COMPOSE_PATH/$image -f $COMPOSE_PATH/$image/docker-compose.yml up -d
+    dryrun cd "$COMPOSE_PATH"/"$image"
+    dryrun docker-compose --project-directory "$COMPOSE_PATH"/"$image" -f "$COMPOSE_PATH"/"$image"/docker-compose.yml up -d
   done
 }
 
 _compose_stop() {
   for image in ${IMAGES[*]}; do
-    cd $COMPOSE_PATH/$image
-    docker-compose --project-directory $COMPOSE_PATH/$image -f $COMPOSE_PATH/$image/docker-compose.yml stop
+    dryrun cd "$COMPOSE_PATH"/"$image"
+    dryrun docker-compose --project-directory "$COMPOSE_PATH"/"$image" -f "$COMPOSE_PATH"/"$image"/docker-compose.yml stop
   done
 }
 
@@ -109,13 +127,23 @@ compose() {
 }
 
 opts() {
-while getopts ":a:c" opt; do
+while getopts ":a:cdhv" opt; do
   case $opt in
     a)
-      compose $OPTARG
+      declare -gi _compose=1
+      declare -g _compose_optarg="$OPTARG"
       ;;
     c)
-      cleanup
+      declare -gi _cleanup=1
+      ;;
+    d)
+      declare -gi DRYRUN=1
+      ;;
+    h)
+      declare -gi _help=1
+      ;;
+    v)
+      declare -gi _version=1
       ;;
     \?)
       echo "Invalid option: -$OPTARG" >&2
@@ -130,8 +158,12 @@ done
 }
 
 main() {
-  [ -z "$1" ] && showhelp && return
+  [[ -z "$1" ]] && showhelp && return
   opts "$@"
+  [[ "${_help}" -ne 0 ]] && showhelp && return
+  [[ "${_version}" -ne 0 ]] && version && return
+  [[ "${_compose}" -ne 0 ]] && compose ${_compose_optarg}
+  [[ "${_cleanup}" -ne 0 ]] && cleanup
 }
 
 main "$@"
