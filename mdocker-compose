@@ -13,6 +13,7 @@
 # 0.2.0 * Add config file
 #       * Add -f, -p options
 #       * Check if configuration file and docker-compose project directory exists
+# 0.2.1 * small style defect fix
 
 
 ## settings
@@ -35,7 +36,7 @@ COMPOSE_PATH='/srv/compose'
 
 ## fix
 
-VERSION=0.2.0
+VERSION=0.2.1
 PROJECT_NAME="mdocker-compose"
 PROJECT_ENTRY="$PROJECT_NAME"
 PROJECT="https://github.com/safematix/$PROJECT_NAME"
@@ -81,7 +82,7 @@ readconfig() {
   fi
 
   while IFS== read -r key value; do
-    CONFIGS["$key"]="${value}"
+    CONFIGS["${key}"]="${value}"
   done < "${CONFIG_FILENAME}"
 }
 
