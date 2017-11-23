@@ -10,6 +10,10 @@
 #       * Add -v, -h, -d options
 #       * Change from yes to integer
 #       * Options order doesn't matter anymore
+# 0.2.0 * Add config file
+#       * Add -f, -p options
+#       * Check if configuration file and docker-compose project directory exists
+
 
 ## settings
 
@@ -19,18 +23,19 @@
 # declare
 declare -i DRYRUN
 declare -i CLEANUP
-
-# list container names
-IMAGES=(project1 project2 project3 project4)
-COMPOSE_PATH="/srv/compose"
+declare -A CONFIGS
 
 # default
 CLEANUP=1
 DRYRUN=0
 
+# config
+CONFIG_FILENAME='/etc/docker/mdocker-compose.conf'
+COMPOSE_PATH='/srv/compose'
+
 ## fix
 
-VERSION=0.1.0
+VERSION=0.2.0
 PROJECT_NAME="mdocker-compose"
 PROJECT_ENTRY="$PROJECT_NAME"
 PROJECT="https://github.com/safematix/$PROJECT_NAME"
@@ -48,16 +53,36 @@ showhelp() {
 Commands:
   --help, -h               Show this help message.
   --version, -v            Show version info.
-  --action, -a             Select action of the script
-  --cleanup, -c            Cleanup docker repository from old data
-  --dryrun, -d             Show the command without executing
+  --file, -f               Configuration file.
+  --path, -p               Docker-compose project directory.
+  --action, -a             Select action of the script.
+  --cleanup, -c            Cleanup docker repository from old data.
+  --dryrun, -d             Show the command without executing.
 
 Parameters:
   --action, -a             fetch, up, stop, restart, all (fetch & up)
+  --file, -f               example /etc/docker/mdocker-compose.conf
+  --path, -p               example /srv/compose
 
 Example:
   $PROJECT_ENTRY -a all -c
   "
+}
+
+readconfig() {
+  if [ ! -f "${CONFIG_FILENAME}" ]; then
+    echo "Config file ${CONFIG_FILENAME} not found!"
+    exit 1
+  fi
+
+  if [ ! -d "${COMPOSE_PATH}" ]; then
+    echo "Directory ${COMPOSE_PATH} not found!"
+    exit 1
+  fi
+
+  while IFS== read -r key value; do
+    CONFIGS["$key"]="${value}"
+  done < "${CONFIG_FILENAME}"
 }
 
 dryrun() {
@@ -75,21 +100,21 @@ cleanup () {
 }
 
 _compose_fetch() {
-  for image in ${IMAGES[*]}; do
+  for image in ${CONFIGS[images]}; do
     dryrun cd "$COMPOSE_PATH"/"$image"
     dryrun docker-compose --project-directory "$COMPOSE_PATH"/"$image" -f "$COMPOSE_PATH"/"$image"/docker-compose.yml pull
   done
 }
 
 _compose_up() {
-  for image in ${IMAGES[*]}; do
+  for image in ${CONFIGS[images]}; do
     dryrun cd "$COMPOSE_PATH"/"$image"
     dryrun docker-compose --project-directory "$COMPOSE_PATH"/"$image" -f "$COMPOSE_PATH"/"$image"/docker-compose.yml up -d
   done
 }
 
 _compose_stop() {
-  for image in ${IMAGES[*]}; do
+  for image in ${CONFIGS[images]}; do
     dryrun cd "$COMPOSE_PATH"/"$image"
     dryrun docker-compose --project-directory "$COMPOSE_PATH"/"$image" -f "$COMPOSE_PATH"/"$image"/docker-compose.yml stop
   done
@@ -97,7 +122,7 @@ _compose_stop() {
 
 compose() {
   # show selected images
-  echo docker-compose images: ${IMAGES[*]}
+  echo docker-compose images: ${CONFIGS[images]}
 
   ACTION=$1
 
@@ -127,7 +152,7 @@ compose() {
 }
 
 opts() {
-while getopts ":a:cdhv" opt; do
+while getopts ":a:cdhvf:p:" opt; do
   case $opt in
     a)
       declare -gi _compose=1
@@ -145,6 +170,12 @@ while getopts ":a:cdhv" opt; do
     v)
       declare -gi _version=1
       ;;
+    f)
+      declare -g CONFIG_FILENAME="${OPTARG}"
+      ;;
+    p)
+      declare -g COMPOSE_PATH="${OPTARG}"
+      ;;
     \?)
       echo "Invalid option: -$OPTARG" >&2
       exit 1
@@ -160,6 +191,7 @@ done
 main() {
   [[ -z "$1" ]] && showhelp && return
   opts "$@"
+  readconfig
   [[ "${_help}" -ne 0 ]] && showhelp && return
   [[ "${_version}" -ne 0 ]] && version && return
   [[ "${_compose}" -ne 0 ]] && compose ${_compose_optarg}
