@@ -14,6 +14,7 @@
 #       * Add -f, -p options
 #       * Check if configuration file and docker-compose project directory exists
 # 0.2.1 * small style defect fix
+# 0.2.2 * small style defect fix
 
 
 ## settings
@@ -81,7 +82,7 @@ readconfig() {
     exit 1
   fi
 
-  while IFS== read -r key value; do
+  while IFS="=" read -r key value; do
     CONFIGS["${key}"]="${value}"
   done < "${CONFIG_FILENAME}"
 }
@@ -123,7 +124,7 @@ _compose_stop() {
 
 compose() {
   # show selected images
-  echo docker-compose images: ${CONFIGS[images]}
+  echo docker-compose images: "${CONFIGS[images]}"
 
   ACTION=$1
 
@@ -195,7 +196,7 @@ main() {
   readconfig
   [[ "${_help}" -ne 0 ]] && showhelp && return
   [[ "${_version}" -ne 0 ]] && version && return
-  [[ "${_compose}" -ne 0 ]] && compose ${_compose_optarg}
+  [[ "${_compose}" -ne 0 ]] && compose "${_compose_optarg}"
   [[ "${_cleanup}" -ne 0 ]] && cleanup
 }
 
